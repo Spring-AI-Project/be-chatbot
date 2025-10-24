@@ -4,6 +4,7 @@ import com.soonwook.aiproject.entity.ChatHistory;
 import com.soonwook.aiproject.entity.User;
 import com.soonwook.aiproject.repository.ChatHistoryRepository;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,5 +37,11 @@ public class ChatHistoryService {
 
   public List<ChatHistory> getHistory(User user){
     return chatHistoryRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+  }
+
+  public List<ChatHistory> getRecentConversations(User user, int limit) {
+    List<ChatHistory> list = chatHistoryRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+    list.sort(Comparator.comparing(ChatHistory::getCreatedAt)); // 시간순 정렬
+    return list.stream().limit(limit).toList();
   }
 }
