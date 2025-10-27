@@ -40,8 +40,12 @@ public class ChatHistoryService {
   }
 
   public List<ChatHistory> getRecentConversations(User user, int limit) {
-    List<ChatHistory> list = chatHistoryRepository.findTop10ByUserOrderByCreatedAtDesc(user);
-    list.sort(Comparator.comparing(ChatHistory::getCreatedAt)); // 시간순 정렬
-    return list.stream().limit(limit).toList();
+    List<ChatHistory> list = chatHistoryRepository
+        .findTop10ByUserOrderByCreatedAtDesc(user);
+    // 최근 N개를 시간순(오름차순)으로 재정렬
+    return list.stream()
+        .sorted(Comparator.comparing(ChatHistory::getCreatedAt))
+        .limit(limit)
+        .toList();
   }
 }

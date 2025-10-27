@@ -8,4 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> {
 
   List<ChatHistory> findTop10ByUserOrderByCreatedAtDesc(User user);
+
+  List<ChatHistory> findTop5ByUserOrderByCreatedAtDesc(User user);
+
 }

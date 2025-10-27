@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -67,37 +68,38 @@ public class ChatBotController {
   }
 
   @GetMapping(value = "/context", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-  public Flux<String> chatWithContext(@RequestParam String prompt,
+  public Flux<ServerSentEvent<String>> chatWithContext(
+      @RequestParam String prompt,
       @AuthenticationPrincipal User user) {
+
     if (user == null) throw new RuntimeException("인증되지 않은 사용자입니다.");
 
     log.info("[Chat-Context] user={} prompt={}", user.getUsername(), prompt);
     chatHistoryService.saveUserMessage(user, prompt);
 
-    // 최근 대화 5개 불러오기
     List<ChatHistory> historyList = chatHistoryService.getRecentConversations(user, 5);
-
-    // 대화 문맥 문자열 생성
     String context = historyList.stream()
         .map(h -> h.getRole() + ": " + h.getMessage())
         .collect(Collectors.joining("\n"));
 
-    // Ollama에 전달할 최종 프롬프트
     String promptWithContext = """
-                당신은 사용자의 질문에 대해 친절하게 답변하는 AI 챗봇입니다.
-                아래는 지금까지의 대화 내용입니다:
+      당신은 사용자의 질문에 대해 친절하게 답변하는 AI 챗봇입니다.
+      모든 답변은 한글로 작성하세요.
 
-                %s
+      [이전 대화]
+      %s
 
-                사용자: %s
-                답변:
-                """.formatted(context, prompt);
+      [사용자] %s
+      [봇]
+      """.formatted(context, prompt);
 
-    StringBuilder responseBuilder = new StringBuilder();
-    log.info(promptWithContext);
+    StringBuilder responseBuf = new StringBuilder();
+
     return chatBotService.streamResponse(promptWithContext)
-        .doOnNext(responseBuilder::append)
-        .doOnComplete(() ->
-            chatHistoryService.saveBotMessage(user, responseBuilder.toString()));
+        .doOnNext(responseBuf::append)                            // ✅ 실제 응답 누적
+        .map(chunk -> ServerSentEvent.builder(chunk).build())     // ✅ SSE 감싸기
+        .doOnComplete(() -> chatHistoryService                    // ✅ 최종 전체 응답 저장
+            .saveBotMessage(user, responseBuf.toString()));
   }
+
 }
